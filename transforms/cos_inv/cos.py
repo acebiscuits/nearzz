@@ -10,8 +10,8 @@ from pydub import AudioSegment
 import io
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds"))
+#датасет имя, 2 места частот, число файлов
+DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds2"))
 
 BASE_OUT_ENC_SIMPLE_DIR = os.path.join(BASE_DIR, "assets", "encrypted", "simple")
 BASE_OUT_DEC_SIMPLE_DIR = os.path.join(BASE_DIR, "assets", "decrypted", "simple")
@@ -51,13 +51,24 @@ DEC_AFTER_CODEC_SPLIT_SIGN_MP3_320_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_D
 DEC_AFTER_CODEC_SPLIT_SIGN_OPUS_32_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "split_sign_opus_32k")
 DEC_AFTER_CODEC_SPLIT_SIGN_OPUS_96_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "split_sign_opus_96k")
 
-N_FILES = 23
+N_FILES = 20
 KEY_PATH = os.path.join(BASE_DIR, "key.bin")
 AudioSegment.converter = os.path.join(FFMPEG_BIN_DIR, "ffmpeg.exe")
 AudioSegment.ffmpeg = os.path.join(FFMPEG_BIN_DIR, "ffmpeg.exe")
 AudioSegment.ffprobe = os.path.join(FFMPEG_BIN_DIR, "ffprobe.exe")
 
 BLOCK_SIZE = 80
+
+def to_int16_safe(sig: np.ndarray, peak: float = 0.98) -> np.ndarray:
+    sig = np.asarray(sig, dtype=np.float64)
+    sig = np.nan_to_num(sig, nan=0.0, posinf=0.0, neginf=0.0)
+
+    max_abs = np.max(np.abs(sig)) + 1e-12
+    if max_abs > 0:
+        sig = sig / max_abs
+
+    sig = sig * (32767.0 * peak)
+    return sig.astype(np.int16)
 
 def to_mono_float(data: np.ndarray) -> np.ndarray:
     if data.ndim > 1:
@@ -100,10 +111,18 @@ def split_process(x: np.ndarray,fs: int, band1_prefilter_cutoff: float, band1_sh
 
     return 1.8 * (y1 + y2)
 
+# def write_wav(path, fs, sig):
+#     sig = np.asarray(sig, dtype=np.float32)
+#     # sig = np.clip(sig, -32768.0, 32767.0)
+#     wavfile.write(path, fs, sig.astype(np.int16))
+# def write_wav(path, fs, sig):
+#     sig = np.asarray(sig, dtype=np.float64)
+#     sig = np.nan_to_num(sig, nan=0.0, posinf=32767.0, neginf=-32768.0)
+#     sig = np.clip(sig, -32768.0, 32767.0)
+#     wavfile.write(path, fs, sig.astype(np.int16))
 def write_wav(path, fs, sig):
-    sig = np.asarray(sig, dtype=np.float32)
-    # sig = np.clip(sig, -32768.0, 32767.0)
-    wavfile.write(path, fs, sig.astype(np.int16))
+    sig = to_int16_safe(sig)
+    wavfile.write(path, fs, sig)
 
 def dc_remove(x: np.ndarray) -> np.ndarray:
     return x - np.mean(x)
@@ -131,8 +150,8 @@ def sign_mask_stream(n_samples, rng, block_size=80):
 
 
 
-def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=8000):
-    sig = np.asarray(sig, dtype=np.int16)
+def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=16000):
+    sig = to_int16_safe(sig)
 
     in_buf = io.BytesIO()
     wavfile.write(in_buf, fs, sig)
@@ -144,7 +163,15 @@ def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=800
     compressed_buf = io.BytesIO()
 
     if codec == "mp3":
-        audio.export(compressed_buf, format="mp3", bitrate=bitrate)
+        # audio.export(compressed_buf, format="mp3", bitrate=bitrate)
+        audio.export(
+            compressed_buf,
+            format="mp3",
+            bitrate=bitrate,
+            parameters=["-b:a", bitrate]
+        )
+        size_bytes = compressed_buf.tell()
+        # print("mp3", bitrate, "size_bytes=", size_bytes)
         compressed_buf.seek(0)
         decoded_audio = AudioSegment.from_file(compressed_buf, format="mp3")
 
@@ -158,6 +185,8 @@ def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=800
 
     decoded_audio = decoded_audio.set_frame_rate(target_fs).set_channels(1)
     decoded = np.array(decoded_audio.get_array_of_samples(), dtype=np.float64)
+    # print(codec, bitrate, decoded_audio.frame_rate, decoded_audio.channels, decoded_audio.sample_width, len(decoded))
+    # print("sum=", np.sum(decoded), "mean=", np.mean(decoded), "std=", np.std(decoded))
 
     return decoded
 
@@ -189,19 +218,20 @@ def split_sign_process( x, fs, nonce, band1_prefilter_cutoff, band1_shift_freq, 
 
 key_bytes = load_key_bytes(KEY_PATH)#эта штука берется в функциях из глобальной области видимости. мб пофиксить надо, но пока что норм.
 
+fs = 16000
 simple_params = {
-    "prefilter_cutoff": 2632.0,
-    "shift_freq": 2632.0,
-    "postfilter_cutoff": 2632.0,
+    "prefilter_cutoff": 2632.0 * fs / 8000.0,
+    "shift_freq": 2632.0 * fs / 8000.0,
+    "postfilter_cutoff": 2632.0 * fs / 8000.0,
 }
 split_params = {
-    "band1_prefilter_cutoff": 500.0,
-    "band1_shift_freq": 500.0,
-    "band1_postfilter_cutoff": 500.0,
+    "band1_prefilter_cutoff": 500.0 * fs / 8000.0,
+    "band1_shift_freq": 500.0 * fs / 8000.0,
+    "band1_postfilter_cutoff": 500.0 * fs / 8000.0,
 
-    "band2_prefilter_cutoff": 2632.0,
-    "band2_shift_freq": 2632.0,
-    "band2_postfilter_cutoff": 2632.0,
+    "band2_prefilter_cutoff": 2632.0 * fs / 8000.0,
+    "band2_shift_freq": 2632.0 * fs / 8000.0,
+    "band2_postfilter_cutoff": 2632.0 * fs / 8000.0,
 }
 
 os.makedirs(BASE_OUT_ENC_SIMPLE_DIR, exist_ok=True)

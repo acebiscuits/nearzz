@@ -18,11 +18,11 @@ segment_length_padded = 2048
 shift_length = 1024
 window_function = hann
 p = 1
-N_FILES = 23
+N_FILES = 20
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds"))
+DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds2"))
 
 OUT_ENC_INVERT_DIR = os.path.join(BASE_DIR, "assets", "encrypted", "invert")
 OUT_DEC_INVERT_DIR = os.path.join(BASE_DIR, "assets", "decrypted", "invert")
@@ -82,6 +82,17 @@ os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_MP3_320_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_OPUS_32_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_OPUS_96_DIR, exist_ok=True)
 
+
+def to_int16_safe(sig: np.ndarray, peak: float = 0.98) -> np.ndarray:
+    sig = np.asarray(sig, dtype=np.float64)
+    sig = np.nan_to_num(sig, nan=0.0, posinf=0.0, neginf=0.0)
+
+    max_abs = np.max(np.abs(sig)) + 1e-12
+    if max_abs > 0:
+        sig = sig / max_abs
+
+    sig = sig * (32767.0 * peak)
+    return sig.astype(np.int16)
 
 def window_nonzero(window_function, segment_length):
     zero_exist = 1
@@ -227,17 +238,16 @@ def stft_unshuffle_with_inv_perms(X, inv_perms):
     return X2
 
 def write_wav(path, fs, sig):
-    wavfile.write(path, fs, sig.astype(np.int16))
+    sig = to_int16_safe(sig)
+    wavfile.write(path, fs, sig)
 
 
 
 
 
 
-def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=8000):
-    sig = np.asarray(sig, dtype=np.float64)
-    sig = np.nan_to_num(sig, nan=0.0, posinf=32767.0, neginf=-32768.0)
-    sig = np.clip(sig, -32768.0, 32767.0).astype(np.int16)
+def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=16000):
+    sig = to_int16_safe(sig)
 
     in_buf = io.BytesIO()
     wavfile.write(in_buf, fs, sig)
@@ -249,7 +259,14 @@ def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=800
     compressed_buf = io.BytesIO()
 
     if codec == "mp3":
-        audio.export(compressed_buf, format="mp3", bitrate=bitrate)
+        # audio.export(compressed_buf, format="mp3", bitrate=bitrate)
+        audio.export(
+            compressed_buf,
+            format="mp3",
+            bitrate=bitrate,
+            parameters=["-b:a", bitrate]
+        )
+        size_bytes = compressed_buf.tell()
         compressed_buf.seek(0)
         decoded_audio = AudioSegment.from_file(compressed_buf, format="mp3")
 
@@ -264,7 +281,6 @@ def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=800
     decoded_audio = decoded_audio.set_frame_rate(target_fs).set_channels(1).set_sample_width(2)
 
     decoded = np.array(decoded_audio.get_array_of_samples(), dtype=np.float64)
-
     return decoded
 
 

@@ -16,7 +16,7 @@ from pydub import AudioSegment
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds"))
+DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds2"))
 
 OUT_ENC_INVERT_DIR = os.path.join(BASE_DIR, "assets", "encrypted", "invert")
 OUT_DEC_INVERT_DIR = os.path.join(BASE_DIR, "assets", "decrypted", "invert")
@@ -79,7 +79,19 @@ os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_OPUS_96_DIR, exist_ok=True)
 M = 2500
 N = 2 * M
 hop = M
-N_FILES = 23
+N_FILES = 20
+
+def to_int16_safe(sig: np.ndarray, peak: float = 0.98) -> np.ndarray:
+    sig = np.asarray(sig, dtype=np.float64)
+    sig = np.nan_to_num(sig, nan=0.0, posinf=0.0, neginf=0.0)
+
+    max_abs = np.max(np.abs(sig)) + 1e-12
+    if max_abs > 0:
+        sig = sig / max_abs
+
+    sig = sig * (32767.0 * peak)
+    return sig.astype(np.int16)
+
 
 
 def mdct4(x):
@@ -153,14 +165,20 @@ def process_mdct_blocks(data, modify_func=None):
     n = np.arange(N)
     window = np.sin(np.pi / N * (n + 0.5))
 
+    data = np.asarray(data, dtype=np.float64)
+
     original_len = len(data)
-    pad = (N - (len(data) % hop)) % hop
-    data = np.pad(data, (0, pad))
 
-    output = np.zeros_like(data, dtype=np.float64)
+    left_pad = hop
+    right_extra = (hop - (original_len % hop)) % hop
+    right_pad = hop + right_extra
 
-    for start in range(0, len(data) - N + 1, hop):
-        frame = data[start:start + N] * window
+    data_padded = np.pad(data, (left_pad, right_pad), mode="constant")
+
+    output = np.zeros_like(data_padded, dtype=np.float64)
+
+    for start in range(0, len(data_padded) - N + 1, hop):
+        frame = data_padded[start:start + N] * window
         Y = mdct4(frame)
 
         if modify_func is not None:
@@ -169,7 +187,7 @@ def process_mdct_blocks(data, modify_func=None):
         Z = imdct4(Y)
         output[start:start + N] += Z * window
 
-    return output[:original_len]
+    return output[left_pad:left_pad + original_len]
 
 
 def invert(Y):
@@ -193,14 +211,14 @@ key_bytes = load_key_bytes(KEY_PATH)
 
 
 def write_wav(path, fs, sig):
-    # sig = np.asarray(sig, dtype=np.float32)
-    # sig = np.clip(sig, -32768.0, 32767.0)
-    wavfile.write(path, fs, sig.astype(np.int16))
+    sig = to_int16_safe(sig)
+    wavfile.write(path, fs, sig)
 
 
 
-def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=8000):
-    sig = np.asarray(sig, dtype=np.int16)
+def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=16000):
+    # sig = np.asarray(sig, dtype=np.int16)
+    sig = to_int16_safe(sig)
 
     in_buf = io.BytesIO()
     wavfile.write(in_buf, fs, sig)
@@ -212,7 +230,14 @@ def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=800
     compressed_buf = io.BytesIO()
 
     if codec == "mp3":
-        audio.export(compressed_buf, format="mp3", bitrate=bitrate)
+        # audio.export(compressed_buf, format="mp3", bitrate=bitrate)
+        audio.export(
+            compressed_buf,
+            format="mp3",
+            bitrate=bitrate,
+            parameters=["-b:a", bitrate]
+        )
+        size_bytes = compressed_buf.tell()
         compressed_buf.seek(0)
         decoded_audio = AudioSegment.from_file(compressed_buf, format="mp3")
 

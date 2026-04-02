@@ -5,21 +5,76 @@ from scipy.io import wavfile
 from scipy import signal
 from pesq import pesq
 
-INDICES = range(1, 24)
+INDICES = range(1, 21)
 
-ORIGINAL_DATASET = "../dataset/test_sounds"
+ORIGINAL_DATASET = "../dataset/test_sounds2"
 
 DATASETS = {
-    "stft_invert_enc": "../transforms/stft/assets/encrypted/invert/test_sound{i}_invert_enc.wav",
-    "stft_shuffle_enc": "../transforms/stft/assets/encrypted/shuffle/test_sound{i}_shuffle_enc.wav",
+   "cos_simple_64K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/simple_mp3_64k/test_sound{i}_simple_dec.wav",
+    "cos_simple_128K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/simple_mp3_128k/test_sound{i}_simple_dec.wav",
+    "cos_simple_320K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/simple_mp3_320k/test_sound{i}_simple_dec.wav",
+    "cos_simple_32K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/simple_opus_32k/test_sound{i}_simple_dec.wav",
+    "cos_simple_96K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/simple_opus_96k/test_sound{i}_simple_dec.wav",
 
-    "stft_invert_dec": "../transforms/stft/assets/decrypted/invert/test_sound{i}_invert_dec.wav",
-    "stft_shuffle_dec": "../transforms/stft/assets/decrypted/shuffle/test_sound{i}_shuffle_dec.wav",
+    "cos_simple_sign_64K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/simple_sign_mp3_64k/test_sound{i}_simple_sign_dec.wav",
+    "cos_simple_sign_128K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/simple_sign_mp3_128k/test_sound{i}_simple_sign_dec.wav",
+    "cos_simple_sign_320K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/simple_sign_mp3_320k/test_sound{i}_simple_sign_dec.wav",
+    "cos_simple_sign_32K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/simple_sign_opus_32k/test_sound{i}_simple_sign_dec.wav",
+    "cos_simple_sign_96K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/simple_sign_opus_96k/test_sound{i}_simple_sign_dec.wav",
+
+    "cos_split_64K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/split_mp3_64k/test_sound{i}_split_dec.wav",
+    "cos_split_128K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/split_mp3_128k/test_sound{i}_split_dec.wav",
+    "cos_split_320K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/split_mp3_320k/test_sound{i}_split_dec.wav",
+    "cos_split_32K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/split_opus_32k/test_sound{i}_split_dec.wav",
+    "cos_split_96K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/split_opus_96k/test_sound{i}_split_dec.wav",
+
+    "cos_split_sign_64K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/split_sign_mp3_64k/test_sound{i}_split_sign_dec.wav",
+    "cos_split_sign_128K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/split_sign_mp3_128k/test_sound{i}_split_sign_dec.wav",
+    "cos_split_sign_320K_mp3": "../transforms/cos_inv/assets/decrypted_after_codec/split_sign_mp3_320k/test_sound{i}_split_sign_dec.wav",
+    "cos_split_sign_32K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/split_sign_opus_32k/test_sound{i}_split_sign_dec.wav",
+    "cos_split_sign_96K_opus": "../transforms/cos_inv/assets/decrypted_after_codec/split_sign_opus_96k/test_sound{i}_split_sign_dec.wav",
+
+    "mdct_invert_64K_mp3": "../transforms/mdct/assets/decrypted_after_codec/invert_mp3_64k/test_sound{i}_invert_dec.wav",
+    "mdct_invert_128K_mp3": "../transforms/mdct/assets/decrypted_after_codec/invert_mp3_128k/test_sound{i}_invert_dec.wav",
+    "mdct_invert_320K_mp3": "../transforms/mdct/assets/decrypted_after_codec/invert_mp3_320k/test_sound{i}_invert_dec.wav",
+    "mdct_invert_32K_opus": "../transforms/mdct/assets/decrypted_after_codec/invert_opus_32k/test_sound{i}_invert_dec.wav",
+    "mdct_invert_96K_opus": "../transforms/mdct/assets/decrypted_after_codec/invert_opus_96k/test_sound{i}_invert_dec.wav",
+
+    "mdct_shuffle_64K_mp3": "../transforms/mdct/assets/decrypted_after_codec/shuffle_mp3_64k/test_sound{i}_shuffle_dec.wav",
+    "mdct_shuffle_128K_mp3": "../transforms/mdct/assets/decrypted_after_codec/shuffle_mp3_128k/test_sound{i}_shuffle_dec.wav",
+    "mdct_shuffle_320K_mp3": "../transforms/mdct/assets/decrypted_after_codec/shuffle_mp3_320k/test_sound{i}_shuffle_dec.wav",
+    "mdct_shuffle_32K_opus": "../transforms/mdct/assets/decrypted_after_codec/shuffle_opus_32k/test_sound{i}_shuffle_dec.wav",
+    "mdct_shuffle_96K_opus": "../transforms/mdct/assets/decrypted_after_codec/shuffle_opus_96k/test_sound{i}_shuffle_dec.wav",
+
+    "mdct_signflip_64K_mp3": "../transforms/mdct/assets/decrypted_after_codec/signflip_mp3_64k/test_sound{i}_signflip_dec.wav",
+    "mdct_signflip_128K_mp3": "../transforms/mdct/assets/decrypted_after_codec/signflip_mp3_128k/test_sound{i}_signflip_dec.wav",
+    "mdct_signflip_320K_mp3": "../transforms/mdct/assets/decrypted_after_codec/signflip_mp3_320k/test_sound{i}_signflip_dec.wav",
+    "mdct_signflip_32K_opus": "../transforms/mdct/assets/decrypted_after_codec/signflip_opus_32k/test_sound{i}_signflip_dec.wav",
+    "mdct_signflip_96K_opus": "../transforms/mdct/assets/decrypted_after_codec/signflip_opus_96k/test_sound{i}_signflip_dec.wav",
+
+    "stft_invert_64K_mp3": "../transforms/stft/assets/decrypted_after_codec/invert_mp3_64k/test_sound{i}_invert_dec.wav",
+    "stft_invert_128K_mp3": "../transforms/stft/assets/decrypted_after_codec/invert_mp3_128k/test_sound{i}_invert_dec.wav",
+    "stft_invert_320K_mp3": "../transforms/stft/assets/decrypted_after_codec/invert_mp3_320k/test_sound{i}_invert_dec.wav",
+    "stft_invert_32K_opus": "../transforms/stft/assets/decrypted_after_codec/invert_opus_32k/test_sound{i}_invert_dec.wav",
+    "stft_invert_96K_opus": "../transforms/stft/assets/decrypted_after_codec/invert_opus_96k/test_sound{i}_invert_dec.wav",
+
+    "stft_shuffle_64K_mp3": "../transforms/stft/assets/decrypted_after_codec/shuffle_mp3_64k/test_sound{i}_shuffle_dec.wav",
+    "stft_shuffle_128K_mp3": "../transforms/stft/assets/decrypted_after_codec/shuffle_mp3_128k/test_sound{i}_shuffle_dec.wav",
+    "stft_shuffle_320K_mp3": "../transforms/stft/assets/decrypted_after_codec/shuffle_mp3_320k/test_sound{i}_shuffle_dec.wav",
+    "stft_shuffle_32K_opus": "../transforms/stft/assets/decrypted_after_codec/shuffle_opus_32k/test_sound{i}_shuffle_dec.wav",
+    "stft_shuffle_96K_opus": "../transforms/stft/assets/decrypted_after_codec/shuffle_opus_96k/test_sound{i}_shuffle_dec.wav",
+
+    "stft_signflip_64K_mp3": "../transforms/stft/assets/decrypted_after_codec/signflip_mp3_64k/test_sound{i}_signflip_dec.wav",
+    "stft_signflip_128K_mp3": "../transforms/stft/assets/decrypted_after_codec/signflip_mp3_128k/test_sound{i}_signflip_dec.wav",
+    "stft_signflip_320K_mp3": "../transforms/stft/assets/decrypted_after_codec/signflip_mp3_320k/test_sound{i}_signflip_dec.wav",
+    "stft_signflip_32K_opus": "../transforms/stft/assets/decrypted_after_codec/signflip_opus_32k/test_sound{i}_signflip_dec.wav",
+    "stft_signflip_96K_opus": "../transforms/stft/assets/decrypted_after_codec/signflip_opus_96k/test_sound{i}_signflip_dec.wav",
 }
 
 FS_TARGET = 16000
-DO_ALIGN = True
-MAX_LAG_MS = 80.0
+PESQ_MODE = "nb"
+DO_ALIGN = False
+MAX_LAG_MS = 150.0
 
 OUT_FILES_CSV = "./pesq_files.csv"
 OUT_MEAN_CSV = "./pesq_mean.csv"
@@ -70,16 +125,14 @@ def align_by_xcorr(ref, test, fs, max_lag_ms=80.0):
     return ref[:n], test[:n], int(lag)
 
 
-def pesq_wb_pair(ref, test, fs_in):
-    ref16 = resample_to(ref, fs_in, FS_TARGET)
-    test16 = resample_to(test, fs_in, FS_TARGET)
+def pesq_pair(ref, test, fs_in, do_align):
 
-    if DO_ALIGN:
-        ref16, test16, lag = align_by_xcorr(ref16, test16, FS_TARGET, MAX_LAG_MS)
+    if do_align:
+        ref, test, lag = align_by_xcorr(ref, test, FS_TARGET, MAX_LAG_MS)
     else:
         lag = 0
 
-    score = float(pesq(FS_TARGET, ref16, test16, "wb"))
+    score = float(pesq(FS_TARGET, ref, test, PESQ_MODE))
     return score, lag
 
 
@@ -97,7 +150,7 @@ def aggregate_pesq(orig_path, datasets, indices):
                 "file": i,
                 "orig_path": orig_file,
                 "proc_path": proc_file,
-                "pesq_wb": np.nan,
+                "pesq": np.nan,
                 "lag_samples_16k": np.nan,
                 "status": "ok",
                 "error": None,
@@ -113,12 +166,10 @@ def aggregate_pesq(orig_path, datasets, indices):
                 fs_o, ref = load_wav(orig_file)
                 fs_p, test = load_wav(proc_file)
 
-                if fs_p != fs_o:
-                    test = resample_to(test, fs_p, fs_o)
+                use_xcorr_align = "_dec" in name
+                score, lag = pesq_pair(ref, test, fs_o, use_xcorr_align)
+                row["pesq"] = score
 
-                score, lag = pesq_wb_pair(ref, test, fs_o)
-
-                row["pesq_wb"] = score
                 row["lag_samples_16k"] = lag
 
             except Exception as e:
@@ -134,8 +185,8 @@ def aggregate_pesq(orig_path, datasets, indices):
         .groupby("dataset", as_index=False)
         .agg(
             count=("file", "count"),
-            pesq_wb_mean=("pesq_wb", "mean"),
-            pesq_wb_std=("pesq_wb", lambda x: float(np.std(x, ddof=0))),
+            pesq_mean=("pesq", "mean"),
+            pesq_std=("pesq", lambda x: float(np.std(x, ddof=0))),
             lag_samples_16k_mean=("lag_samples_16k", "mean"),
         )
         .sort_values("dataset")
@@ -153,8 +204,8 @@ def main():
     )
 
     os.makedirs(os.path.dirname(OUT_FILES_CSV) or ".", exist_ok=True)
-    df_files.to_csv(OUT_FILES_CSV, index=False, encoding="utf-8")
-    df_mean.to_csv(OUT_MEAN_CSV, index=False, encoding="utf-8")
+    df_files.to_csv(OUT_FILES_CSV, index=False, encoding="utf-8", sep=";")
+    df_mean.to_csv(OUT_MEAN_CSV, index=False, encoding="utf-8", sep=";")
 
     print(df_files.to_string(index=False))
     print()
