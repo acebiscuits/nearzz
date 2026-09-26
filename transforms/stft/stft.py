@@ -7,53 +7,53 @@ import matplotlib.pyplot as plt
 import os
 import hashlib
 import io
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 FFMPEG_BIN_DIR = r"D:\5_year\nirs\ffmpeg\bin"
 os.environ["PATH"] = FFMPEG_BIN_DIR + os.pathsep + os.environ["PATH"]
 
 from pydub import AudioSegment
 
-segment_length = 2048
-segment_length_padded = 2048
-shift_length = 1024
-window_function = hann
-p = 1
-N_FILES = 20
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds2"))
+DATASET_DIR = os.path.normpath(os.path.join(BASE_DIR, "../../dataset/test_sounds3"))
 
 OUT_ENC_INVERT_DIR = os.path.join(BASE_DIR, "assets", "encrypted", "invert")
 OUT_DEC_INVERT_DIR = os.path.join(BASE_DIR, "assets", "decrypted", "invert")
 
 OUT_ENC_SHUFFLE_DIR = os.path.join(BASE_DIR, "assets", "encrypted", "shuffle")
 OUT_DEC_SHUFFLE_DIR = os.path.join(BASE_DIR, "assets", "decrypted", "shuffle")
+OUT_DEC_SHUFFLE_WK_DIR = os.path.join(BASE_DIR, "assets", "decrypted_wrong_key", "shuffle")
 
 OUT_ENC_SIGNFLIP_DIR = os.path.join(BASE_DIR, "assets", "encrypted", "signflip")
 OUT_DEC_SIGNFLIP_DIR = os.path.join(BASE_DIR, "assets", "decrypted", "signflip")
+OUT_DEC_SIGNFLIP_WK_DIR = os.path.join(BASE_DIR, "assets", "decrypted_wrong_key", "signflip")
 
 BASE_OUT_DEC_AFTER_CODEC_DIR = os.path.join(BASE_DIR, "assets", "decrypted_after_codec")
 
 DEC_AFTER_CODEC_INVERT_MP3_64_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "invert_mp3_64k")
 DEC_AFTER_CODEC_INVERT_MP3_128_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "invert_mp3_128k")
 DEC_AFTER_CODEC_INVERT_MP3_320_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "invert_mp3_320k")
-DEC_AFTER_CODEC_INVERT_OPUS_32_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "invert_opus_32k")
+DEC_AFTER_CODEC_INVERT_OPUS_16_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "invert_opus_16k")
+DEC_AFTER_CODEC_INVERT_OPUS_48_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "invert_opus_48k")
 DEC_AFTER_CODEC_INVERT_OPUS_96_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "invert_opus_96k")
 
 DEC_AFTER_CODEC_SHUFFLE_MP3_64_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "shuffle_mp3_64k")
 DEC_AFTER_CODEC_SHUFFLE_MP3_128_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "shuffle_mp3_128k")
 DEC_AFTER_CODEC_SHUFFLE_MP3_320_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "shuffle_mp3_320k")
-DEC_AFTER_CODEC_SHUFFLE_OPUS_32_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "shuffle_opus_32k")
+DEC_AFTER_CODEC_SHUFFLE_OPUS_16_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "shuffle_opus_16k")
+DEC_AFTER_CODEC_SHUFFLE_OPUS_48_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "shuffle_opus_48k")
 DEC_AFTER_CODEC_SHUFFLE_OPUS_96_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "shuffle_opus_96k")
 
 DEC_AFTER_CODEC_SIGNFLIP_MP3_64_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "signflip_mp3_64k")
 DEC_AFTER_CODEC_SIGNFLIP_MP3_128_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "signflip_mp3_128k")
 DEC_AFTER_CODEC_SIGNFLIP_MP3_320_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "signflip_mp3_320k")
-DEC_AFTER_CODEC_SIGNFLIP_OPUS_32_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "signflip_opus_32k")
+DEC_AFTER_CODEC_SIGNFLIP_OPUS_16_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "signflip_opus_16k")
+DEC_AFTER_CODEC_SIGNFLIP_OPUS_48_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "signflip_opus_48k")
 DEC_AFTER_CODEC_SIGNFLIP_OPUS_96_DIR = os.path.join(BASE_OUT_DEC_AFTER_CODEC_DIR, "signflip_opus_96k")
 
 KEY_PATH = os.path.join(BASE_DIR, "key", "key.bin")
+WRONG_KEY_PATH = os.path.join(BASE_DIR, "key", "wrong_key.bin")
 AudioSegment.converter = os.path.join(FFMPEG_BIN_DIR, "ffmpeg.exe")
 AudioSegment.ffmpeg = os.path.join(FFMPEG_BIN_DIR, "ffmpeg.exe")
 AudioSegment.ffprobe = os.path.join(FFMPEG_BIN_DIR, "ffprobe.exe")
@@ -67,31 +67,38 @@ os.makedirs(OUT_DEC_SIGNFLIP_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_INVERT_MP3_64_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_INVERT_MP3_128_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_INVERT_MP3_320_DIR, exist_ok=True)
-os.makedirs(DEC_AFTER_CODEC_INVERT_OPUS_32_DIR, exist_ok=True)
+os.makedirs(DEC_AFTER_CODEC_INVERT_OPUS_16_DIR, exist_ok=True)
+os.makedirs(DEC_AFTER_CODEC_INVERT_OPUS_48_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_INVERT_OPUS_96_DIR, exist_ok=True)
 
 os.makedirs(DEC_AFTER_CODEC_SHUFFLE_MP3_64_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SHUFFLE_MP3_128_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SHUFFLE_MP3_320_DIR, exist_ok=True)
-os.makedirs(DEC_AFTER_CODEC_SHUFFLE_OPUS_32_DIR, exist_ok=True)
+os.makedirs(DEC_AFTER_CODEC_SHUFFLE_OPUS_16_DIR, exist_ok=True)
+os.makedirs(DEC_AFTER_CODEC_SHUFFLE_OPUS_48_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SHUFFLE_OPUS_96_DIR, exist_ok=True)
 
 os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_MP3_64_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_MP3_128_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_MP3_320_DIR, exist_ok=True)
-os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_OPUS_32_DIR, exist_ok=True)
+os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_OPUS_16_DIR, exist_ok=True)
+os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_OPUS_48_DIR, exist_ok=True)
 os.makedirs(DEC_AFTER_CODEC_SIGNFLIP_OPUS_96_DIR, exist_ok=True)
+
+os.makedirs(OUT_DEC_SHUFFLE_WK_DIR, exist_ok=True)
+os.makedirs(OUT_DEC_SIGNFLIP_WK_DIR, exist_ok=True)
 
 
 def to_int16_safe(sig: np.ndarray, peak: float = 0.98) -> np.ndarray:
     sig = np.asarray(sig, dtype=np.float64)
     sig = np.nan_to_num(sig, nan=0.0, posinf=0.0, neginf=0.0)
+    sig = np.clip(sig, -32768, 32767)
+    # max_abs = np.max(np.abs(sig)) + 1e-12
+    # if max_abs > 0:
+    #     sig = sig / max_abs
 
-    max_abs = np.max(np.abs(sig)) + 1e-12
-    if max_abs > 0:
-        sig = sig / max_abs
+    # sig = sig * (32767.0 * peak)
 
-    sig = sig * (32767.0 * peak)
     return sig.astype(np.int16)
 
 def window_nonzero(window_function, segment_length):
@@ -113,6 +120,14 @@ def window_nonzero(window_function, segment_length):
             zero_exist = 0
 
     return window_vector
+
+segment_length = 2048
+segment_length_padded = 2048
+shift_length = 1024
+window_function = hann
+p = 1
+N_FILES = 1722
+WINDOW_VECTOR = window_nonzero(window_function, segment_length)
 
 
 def create_overlapping_segments(x, segment_length, shift_length):
@@ -138,7 +153,7 @@ def create_overlapping_segments(x, segment_length, shift_length):
 
 def stft(x, segment_length, segment_length_padded, shift_length, window_function):
 
-    window_vector = window_nonzero(window_function, segment_length)
+    window_vector = WINDOW_VECTOR
 
     x_segments, start_list, stop_list = create_overlapping_segments(x, segment_length, shift_length)
 
@@ -154,14 +169,12 @@ def stft(x, segment_length, segment_length_padded, shift_length, window_function
 
 
 
-def istft(x_stft, segment_length, segment_length_padded,
-          start_list, stop_list, original_size,
-          window_function, p):
+def istft(x_stft, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p):
 
     x_segments = np.fft.irfft(x_stft, n=segment_length_padded, axis=0)
     x_segments = x_segments[0:segment_length]
 
-    window_vector = window_nonzero(window_function, segment_length)
+    window_vector = WINDOW_VECTOR
 
     window_array = np.ones(x_segments.shape)
     for i in range(window_array.shape[0]):
@@ -194,11 +207,13 @@ def load_key_bytes(path):
 
 
 def rng_from_key(key_bytes, nonce):
-    h = hashlib.sha256()
+    h = hashlib.sha512()
     h.update(key_bytes)
     h.update(str(nonce).encode("utf-8"))
-    seed = int.from_bytes(h.digest()[:8], "big", signed=False)
-    return np.random.default_rng(seed)
+    digest = h.digest()
+    seed_words = np.frombuffer(digest, dtype=np.uint32)
+    seed_seq = np.random.SeedSequence(seed_words, pool_size=8)
+    return np.random.default_rng(seed_seq)
 
 
 def sign_mask_matrix(shape, rng):
@@ -259,36 +274,27 @@ def compress_decompress_array(sig, fs, codec="mp3", bitrate="64k", target_fs=160
     compressed_buf = io.BytesIO()
 
     if codec == "mp3":
-        # audio.export(compressed_buf, format="mp3", bitrate=bitrate)
-        audio.export(
-            compressed_buf,
-            format="mp3",
-            bitrate=bitrate,
-            parameters=["-b:a", bitrate]
-        )
-        size_bytes = compressed_buf.tell()
+        audio.export(compressed_buf, format="mp3", bitrate=bitrate, parameters=["-b:a", bitrate])
         compressed_buf.seek(0)
         decoded_audio = AudioSegment.from_file(compressed_buf, format="mp3")
-
     elif codec == "opus":
         audio.export(compressed_buf, format="ogg", codec="libopus", bitrate=bitrate)
         compressed_buf.seek(0)
         decoded_audio = AudioSegment.from_file(compressed_buf, format="ogg")
-
     else:
         raise ValueError(f"unsupported codec: {codec}")
 
     decoded_audio = decoded_audio.set_frame_rate(target_fs).set_channels(1).set_sample_width(2)
-
     decoded = np.array(decoded_audio.get_array_of_samples(), dtype=np.float64)
-    return decoded
+    return target_fs, decoded
 
 
 CODEC_VARIANTS = [
     ("mp3", "64k"),
     ("mp3", "128k"),
     ("mp3", "320k"),
-    ("opus", "32k"),
+    ("opus", "16k"),
+    ("opus", "48k"),
     ("opus", "96k"),
 ]
 
@@ -298,31 +304,30 @@ def get_after_codec_dir(mode: str, codec: str, bitrate: str) -> str:
         ("invert", "mp3", "64k"): DEC_AFTER_CODEC_INVERT_MP3_64_DIR,
         ("invert", "mp3", "128k"): DEC_AFTER_CODEC_INVERT_MP3_128_DIR,
         ("invert", "mp3", "320k"): DEC_AFTER_CODEC_INVERT_MP3_320_DIR,
-        ("invert", "opus", "32k"): DEC_AFTER_CODEC_INVERT_OPUS_32_DIR,
+        ("invert", "opus", "16k"): DEC_AFTER_CODEC_INVERT_OPUS_16_DIR,
+        ("invert", "opus", "48k"): DEC_AFTER_CODEC_INVERT_OPUS_48_DIR,
         ("invert", "opus", "96k"): DEC_AFTER_CODEC_INVERT_OPUS_96_DIR,
 
         ("shuffle", "mp3", "64k"): DEC_AFTER_CODEC_SHUFFLE_MP3_64_DIR,
         ("shuffle", "mp3", "128k"): DEC_AFTER_CODEC_SHUFFLE_MP3_128_DIR,
         ("shuffle", "mp3", "320k"): DEC_AFTER_CODEC_SHUFFLE_MP3_320_DIR,
-        ("shuffle", "opus", "32k"): DEC_AFTER_CODEC_SHUFFLE_OPUS_32_DIR,
+        ("shuffle", "opus", "16k"): DEC_AFTER_CODEC_SHUFFLE_OPUS_16_DIR,
+        ("shuffle", "opus", "48k"): DEC_AFTER_CODEC_SHUFFLE_OPUS_48_DIR,
         ("shuffle", "opus", "96k"): DEC_AFTER_CODEC_SHUFFLE_OPUS_96_DIR,
 
         ("signflip", "mp3", "64k"): DEC_AFTER_CODEC_SIGNFLIP_MP3_64_DIR,
         ("signflip", "mp3", "128k"): DEC_AFTER_CODEC_SIGNFLIP_MP3_128_DIR,
         ("signflip", "mp3", "320k"): DEC_AFTER_CODEC_SIGNFLIP_MP3_320_DIR,
-        ("signflip", "opus", "32k"): DEC_AFTER_CODEC_SIGNFLIP_OPUS_32_DIR,
+        ("signflip", "opus", "16k"): DEC_AFTER_CODEC_SIGNFLIP_OPUS_16_DIR,
+        ("signflip", "opus", "48k"): DEC_AFTER_CODEC_SIGNFLIP_OPUS_48_DIR,
         ("signflip", "opus", "96k"): DEC_AFTER_CODEC_SIGNFLIP_OPUS_96_DIR,
     }
     return dirs[(mode, codec, bitrate)]
 
 
 
-
-
-key_bytes = load_key_bytes(KEY_PATH)
-
-for i in range(1, N_FILES + 1):
-    in_path = os.path.join(DATASET_DIR, f"test_sound{i:1d}.wav")
+def process_one_file(i):
+    in_path = os.path.join(DATASET_DIR, f"test_sound{i}.wav")
 
     fs, data = wavfile.read(in_path)
 
@@ -334,100 +339,89 @@ for i in range(1, N_FILES + 1):
 
     X_stft, start_list, stop_list = stft(data, segment_length, segment_length_padded, shift_length, window_function)
 
-    X_inv = X_stft[::-1, :]
-
-    inv_audio = istft( X_inv, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
-
-    X_inv_dec = X_inv[::-1, :]
-
-    inv_dec = istft( X_inv_dec, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
-
-    write_wav(os.path.join(OUT_ENC_INVERT_DIR, f"test_sound{i:1d}_invert_enc.wav"), fs, inv_audio)
-    write_wav(os.path.join(OUT_DEC_INVERT_DIR, f"test_sound{i:1d}_invert_dec.wav"), fs, inv_dec)
-
-    shuffle_nonce = f"test_sound{i}_shuffle"
-    shuffle_rng = rng_from_key(key_bytes, nonce=shuffle_nonce)
-
-    perms, inv_perms = build_perm_matrix( X_stft.shape[0], X_stft.shape[1], shuffle_rng)
-
-    X_shuffle = stft_shuffle_with_perms(X_stft, perms)
-
-    shuffle_audio = istft( X_shuffle, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
-
-    X_shuffle_dec = stft_unshuffle_with_inv_perms(X_shuffle, inv_perms)
-
-    shuffle_dec = istft( X_shuffle_dec, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
-
-    write_wav(os.path.join(OUT_ENC_SHUFFLE_DIR, f"test_sound{i}_shuffle_enc.wav"), fs, shuffle_audio)
-    write_wav(os.path.join(OUT_DEC_SHUFFLE_DIR, f"test_sound{i}_shuffle_dec.wav"), fs, shuffle_dec)
-
-    signflip_nonce = f"test_sound{i}_signflip"
-    signflip_rng = rng_from_key(key_bytes, nonce=signflip_nonce)
-
-    mask = sign_mask_matrix((X_stft.shape[0] - 2, X_stft.shape[1]), signflip_rng)
-
-    X_sign = stft_signflip_with_mask(X_stft, mask)
-
-    sign_audio = istft( X_sign, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
-
-    X_sign_dec = stft_signflip_with_mask(X_sign, mask)
-
-    sign_dec = istft( X_sign_dec, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
-
-    write_wav(os.path.join(OUT_ENC_SIGNFLIP_DIR, f"test_sound{i}_signflip_enc.wav"), fs, sign_audio)
-    write_wav(os.path.join(OUT_DEC_SIGNFLIP_DIR, f"test_sound{i}_signflip_dec.wav"), fs, sign_dec)
-
-    # ===== decrypted_after_codec datasets =====
-
     # invert
-    X_inv = X_stft[::-1, :]
-    inv_audio = istft(X_inv, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
+    # X_inv = X_stft[::-1, :]
+    # inv_audio = istft(X_inv, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
+    # X_inv_dec = X_inv[::-1, :]
+    # inv_dec = istft(X_inv_dec, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
 
-    for codec, bitrate in CODEC_VARIANTS:
-        inv_audio_after_codec = compress_decompress_array(inv_audio, fs, codec=codec, bitrate=bitrate)
-
-        X_inv_after_codec, start_list_c, stop_list_c = stft(inv_audio_after_codec, segment_length, segment_length_padded, shift_length, window_function)
-        X_inv_dec_after_codec = X_inv_after_codec[::-1, :]
-        inv_dec_after_codec = istft(X_inv_dec_after_codec, segment_length, segment_length_padded, start_list_c, stop_list_c, inv_audio_after_codec.shape, window_function, p)
-
-        out_dir = get_after_codec_dir("invert", codec, bitrate)
-        out_name = f"test_sound{i}_invert_dec.wav"
-        write_wav(os.path.join(out_dir, out_name), fs, inv_dec_after_codec)
+    # write_wav(os.path.join(OUT_ENC_INVERT_DIR, f"test_sound{i}_invert_enc.wav"), fs, inv_audio)
+    # write_wav(os.path.join(OUT_DEC_INVERT_DIR, f"test_sound{i}_invert_dec.wav"), fs, inv_dec)
 
     # shuffle
     shuffle_nonce = f"test_sound{i}_shuffle"
     shuffle_rng = rng_from_key(key_bytes, nonce=shuffle_nonce)
     perms, inv_perms = build_perm_matrix(X_stft.shape[0], X_stft.shape[1], shuffle_rng)
 
+    shuffle_rng_wrong_key = rng_from_key(wrong_key_bytes, nonce=shuffle_nonce)
+    perms_wrong_key, inv_perms_wrong_key = build_perm_matrix(X_stft.shape[0], X_stft.shape[1], shuffle_rng_wrong_key)
+
     X_shuffle = stft_shuffle_with_perms(X_stft, perms)
     shuffle_audio = istft(X_shuffle, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
+    X_shuffle_dec = stft_unshuffle_with_inv_perms(X_shuffle, inv_perms_wrong_key)
+    shuffle_dec = istft(X_shuffle_dec, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
 
-    for codec, bitrate in CODEC_VARIANTS:
-        shuffle_audio_after_codec = compress_decompress_array(shuffle_audio, fs, codec=codec, bitrate=bitrate)
-
-        X_shuffle_after_codec, start_list_c, stop_list_c = stft(shuffle_audio_after_codec, segment_length, segment_length_padded, shift_length, window_function)
-        X_shuffle_dec_after_codec = stft_unshuffle_with_inv_perms(X_shuffle_after_codec, inv_perms)
-        shuffle_dec_after_codec = istft(X_shuffle_dec_after_codec, segment_length, segment_length_padded, start_list_c, stop_list_c, shuffle_audio_after_codec.shape, window_function, p)
-
-        out_dir = get_after_codec_dir("shuffle", codec, bitrate)
-        out_name = f"test_sound{i}_shuffle_dec.wav"
-        write_wav(os.path.join(out_dir, out_name), fs, shuffle_dec_after_codec)
+    write_wav(os.path.join(OUT_ENC_SHUFFLE_DIR, f"test_sound{i}_shuffle_enc.wav"), fs, shuffle_audio)
+    write_wav(os.path.join(OUT_DEC_SHUFFLE_WK_DIR, f"test_sound{i}_shuffle_dec.wav"), fs, shuffle_dec)
 
     # signflip
     signflip_nonce = f"test_sound{i}_signflip"
     signflip_rng = rng_from_key(key_bytes, nonce=signflip_nonce)
     mask = sign_mask_matrix((X_stft.shape[0] - 2, X_stft.shape[1]), signflip_rng)
 
+    signflip_rng_wrong_key = rng_from_key(wrong_key_bytes, nonce=signflip_nonce)
+    mask_wrong_key = sign_mask_matrix((X_stft.shape[0] - 2, X_stft.shape[1]), signflip_rng_wrong_key)
+
     X_sign = stft_signflip_with_mask(X_stft, mask)
     sign_audio = istft(X_sign, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
+    X_sign_dec = stft_signflip_with_mask(X_sign, mask_wrong_key)
+    sign_dec = istft(X_sign_dec, segment_length, segment_length_padded, start_list, stop_list, original_size, window_function, p)
 
-    for codec, bitrate in CODEC_VARIANTS:
-        sign_audio_after_codec = compress_decompress_array(sign_audio, fs, codec=codec, bitrate=bitrate)
+    write_wav(os.path.join(OUT_ENC_SIGNFLIP_DIR, f"test_sound{i}_signflip_enc.wav"), fs, sign_audio)
+    write_wav(os.path.join(OUT_DEC_SIGNFLIP_WK_DIR, f"test_sound{i}_signflip_dec.wav"), fs, sign_dec)
 
-        X_sign_after_codec, start_list_c, stop_list_c = stft(sign_audio_after_codec, segment_length, segment_length_padded, shift_length, window_function)
-        X_sign_dec_after_codec = stft_signflip_with_mask(X_sign_after_codec, mask)
-        sign_dec_after_codec = istft(X_sign_dec_after_codec, segment_length, segment_length_padded, start_list_c, stop_list_c, sign_audio_after_codec.shape, window_function, p)
+    # after codec: invert
+    # for codec, bitrate in CODEC_VARIANTS:
+    #     fs_c, inv_audio_after_codec = compress_decompress_array(inv_audio, fs, codec=codec, bitrate=bitrate)
+    #     X_inv_after_codec, start_list_c, stop_list_c = stft(inv_audio_after_codec, segment_length, segment_length_padded, shift_length, window_function)
+    #     X_inv_dec_after_codec = X_inv_after_codec[::-1, :]
+    #     inv_dec_after_codec = istft(X_inv_dec_after_codec, segment_length, segment_length_padded, start_list_c, stop_list_c, inv_audio_after_codec.shape, window_function, p)
 
-        out_dir = get_after_codec_dir("signflip", codec, bitrate)
-        out_name = f"test_sound{i}_signflip_dec.wav"
-        write_wav(os.path.join(out_dir, out_name), fs, sign_dec_after_codec)
+    #     out_dir = get_after_codec_dir("invert", codec, bitrate)
+    #     write_wav(os.path.join(out_dir, f"test_sound{i}_invert_dec.wav"), fs_c, inv_dec_after_codec)
+
+    # # after codec: shuffle
+    # for codec, bitrate in CODEC_VARIANTS:
+    #     fs_c, shuffle_audio_after_codec = compress_decompress_array(shuffle_audio, fs, codec=codec, bitrate=bitrate)
+    #     X_shuffle_after_codec, start_list_c, stop_list_c = stft(shuffle_audio_after_codec, segment_length, segment_length_padded, shift_length, window_function)
+    #     X_shuffle_dec_after_codec = stft_unshuffle_with_inv_perms(X_shuffle_after_codec, inv_perms)
+    #     shuffle_dec_after_codec = istft(X_shuffle_dec_after_codec, segment_length, segment_length_padded, start_list_c, stop_list_c, shuffle_audio_after_codec.shape, window_function, p)
+
+    #     out_dir = get_after_codec_dir("shuffle", codec, bitrate)
+    #     write_wav(os.path.join(out_dir, f"test_sound{i}_shuffle_dec.wav"), fs_c, shuffle_dec_after_codec)
+
+    # # after codec: signflip
+    # for codec, bitrate in CODEC_VARIANTS:
+    #     fs_c, sign_audio_after_codec = compress_decompress_array(sign_audio, fs, codec=codec, bitrate=bitrate)
+    #     X_sign_after_codec, start_list_c, stop_list_c = stft(sign_audio_after_codec, segment_length, segment_length_padded, shift_length, window_function)
+    #     X_sign_dec_after_codec = stft_signflip_with_mask(X_sign_after_codec, mask)
+    #     sign_dec_after_codec = istft(X_sign_dec_after_codec, segment_length, segment_length_padded, start_list_c, stop_list_c, sign_audio_after_codec.shape, window_function, p)
+
+    #     out_dir = get_after_codec_dir("signflip", codec, bitrate)
+    #     write_wav(os.path.join(out_dir, f"test_sound{i}_signflip_dec.wav"), fs_c, sign_dec_after_codec)
+
+    return f"done: test_sound{i}.wav"
+
+key_bytes = load_key_bytes(KEY_PATH)
+wrong_key_bytes = load_key_bytes(WRONG_KEY_PATH)
+
+if __name__ == "__main__":
+    with ProcessPoolExecutor(max_workers=8) as executor:
+        futures = {executor.submit(process_one_file, i): i for i in range(1, N_FILES + 1)}
+
+        for future in as_completed(futures):
+            i = futures[future]
+            try:
+                print(future.result())
+            except Exception as e:
+                print(f"fail: test_sound{i}.wav -> {e}")
